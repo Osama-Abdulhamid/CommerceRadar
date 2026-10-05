@@ -21,7 +21,8 @@ Implemented:
 - Sample validation script with format and duplicate-ID checks.
 - Pinned development dependencies.
 - Environment variable template.
-- Docker Compose skeleton, validated with docker compose config.
+- Docker Compose configuration with a Replay Producer service.
+- Replay Producer image built and tested successfully with exit code 0.
 - Local Replay Producer with schema validation and configurable timing.
 - Replay Producer usage documented in services/replay_producer/README.md.
 
@@ -121,7 +122,23 @@ Validate the Compose configuration:
 docker compose config
 ```
 
-The current Compose file has no services. Do not run docker compose up yet.
+Build the Replay Producer image:
+
+```bash
+docker compose build replay-producer
+```
+
+Run the Replay Producer in a temporary container:
+
+```bash
+docker compose run --rm replay-producer
+```
+
+The producer emits the five sample events and exits.
+The temporary container is removed after execution.
+
+Kafka and the remaining infrastructure services are not implemented yet.
+See services/replay_producer/README.md for details.
 
 ## Data Contract
 

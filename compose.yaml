@@ -1,7 +1,18 @@
 name: ${COMPOSE_PROJECT_NAME:-commerceradar}
 
-# Services will be added incrementally.
-services: {}
+services:
+  replay-producer:
+    build:
+      context: .
+      dockerfile: services/replay_producer/Dockerfile
+    environment:
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      SCHEMA_VERSION: "${SCHEMA_VERSION:-1.0}"
+      REPLAY_INPUT_PATH: ${REPLAY_INPUT_PATH:-data/samples/product_observations.v1.jsonl}
+      REPLAY_INTERVAL_SECONDS: "${REPLAY_INTERVAL_SECONDS:-1}"
+    networks:
+      - commerceradar
+    restart: "no"
 
 networks:
   commerceradar:

@@ -13,7 +13,8 @@ Replays saved product observations at a configurable interval.
 Events retain their original event_id and observed_at.
 Replaying an event does not create a new observation.
 
-Kafka delivery and Docker execution are not implemented yet.
+Docker execution is implemented and verified.
+Kafka delivery is not implemented yet.
 
 ## Local Execution
 
@@ -93,3 +94,37 @@ Use it for small development samples, not the full historical dataset.
 
 It does not provide Kafka delivery, retries, continuous looping,
 or pipeline-wide deduplication.
+
+
+## Docker Execution
+
+Run these commands from the project root.
+
+Build the image:
+
+```bash
+docker compose build replay-producer
+```
+
+Run a temporary container:
+
+```bash
+docker compose run --rm replay-producer
+```
+
+Compose passes the configured environment variables to the container.
+The image includes the schema and the synthetic sample dataset.
+
+Expected:
+- Five events emitted with a one-second interval by default.
+- A completion message.
+- Exit code 0.
+
+The container runs as a non-root user.
+The --rm option removes the temporary container after it exits;
+the image remains available.
+
+Rebuild the image after changing the code, schema, dependencies,
+or bundled sample data.
+
+Docker execution was verified successfully with the five sample events.
