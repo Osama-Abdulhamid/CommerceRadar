@@ -1,0 +1,8 @@
+name: ${COMPOSE_PROJECT_NAME:-commerceradar}
+
+# Services will be added incrementally.
+services: {}
+
+networks:
+  commerceradar:
+    driver: bridge

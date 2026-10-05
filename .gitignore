@@ -1,0 +1,42 @@
+# Python virtual environments
+.venv/
+venv/
+
+# Python cache and build files
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Test and tool caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Local datasets and generated outputs
+/data/*
+!/data/samples/
+/data/samples/*
+!/data/samples/*.jsonl
+!/data/samples/README.md
+
+# Runtime files
+*.log
+/checkpoints/
+/spark-warehouse/
+/artifacts/
+
+# Editor and operating system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
