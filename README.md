@@ -22,6 +22,8 @@ Implemented:
 - Pinned development dependencies.
 - Environment variable template.
 - Docker Compose skeleton, validated with docker compose config.
+- Local Replay Producer with schema validation and configurable timing.
+- Replay Producer usage documented in services/replay_producer/README.md.
 
 No application or infrastructure services are running yet.
 
