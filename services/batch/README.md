@@ -47,7 +47,9 @@ cleaned_record_json, which embeds the cleaned JSON record
 and its original raw record.
 
 The 1,000-record cleaned sample passed JSON Schema validation.
-The full batch job does not validate every record against that schema.
+The cleaning job does not perform schema validation itself.
+A separate validation job checked all 16,451,499 output JSON records
+against the batch contract and found zero violations.
 
 ## Run the Full Dataset
 
@@ -123,9 +125,52 @@ They do not prove that every parsed price is semantically correct.
 ## Remaining Work
 
 - Expand cleaning checks using additional real examples.
-- Validate the full output against the batch contract.
-- Reconcile the source record count with the output count.
 - Integrate HDFS storage.
 - Implement product matching and historical aggregations.
 - Load analytical results into ClickHouse.
 - Improve storage layout to reduce duplicated information.
+
+## Full Dataset Validation
+
+Verified after cleaning:
+
+- Source records: 16,451,499.
+- Saved records: 16,451,499.
+- All embedded cleaned JSON records checked against the batch contract.
+- Contract violations: 0.
+- Duplicate source ID groups: 0.
+
+Schema validation checks structure and declared constraints.
+It does not prove semantic accuracy of parsed prices.
+
+### Run Validation
+
+Run from the repository root.
+The validation uses the locally built Spark Streaming image,
+which includes jsonschema. Build it first if unavailable:
+
+```bash
+docker compose build spark-streaming
+```
+
+Validate the existing Parquet output without modifying it:
+
+```bash
+docker run --rm --user 0:0 \
+  --mount type=bind,source="$PWD",target=/workspace,readonly \
+  --mount type=bind,source=/mnt/e/CommerceRadarData/processed,target=/output,readonly \
+  --mount type=bind,source=/mnt/e/CommerceRadarData/spark-tmp,target=/spark-tmp \
+  -e BATCH_OUTPUT_PATH=/output/wdc_full_cleaned_v1 \
+  -e PYSPARK_PYTHON=python3 \
+  -e PYSPARK_DRIVER_PYTHON=python3 \
+  --entrypoint /opt/spark/bin/spark-submit \
+  commerceradar-spark-streaming:latest \
+  --master 'local[2]' \
+  --driver-memory 2g \
+  --conf spark.local.dir=/spark-tmp \
+  /workspace/services/batch/validate_wdc.py
+```
+
+The script reports results after all partitions finish.
+It fails if any JSON record violates the contract or
+the record count differs from 16,451,499.
