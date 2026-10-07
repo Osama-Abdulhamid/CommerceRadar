@@ -42,7 +42,6 @@ Console output is for development and is not durable storage.
 
 ## Pending
 
-- Durable storage for rejected records.
 - Duplicate-event handling.
 - ClickHouse delivery and recovery tests.
 
@@ -54,4 +53,18 @@ Rejection logs include the reason, original JSON, topic, partition, and offset.
 Decimal overflow and unparseable timestamps are also rejected.
 
 Verified: five valid observations accepted and one incomplete record rejected.
-Rejected records are currently displayed in logs only.
+Rejected records are logged and saved as Parquet in the spark-state volume.
+
+## Rejected Record Storage
+
+Path: /state/rejected-console-v1/batch-<batch_id>
+
+Stored fields: topic, partition, offset, kafka_timestamp,
+raw_json, and validation_error.
+
+Retries overwrite the directory for the same batch ID.
+Keep this storage paired with its original checkpoint.
+Records processed before this feature are not backfilled.
+Storage is local to this prototype; a distributed deployment needs shared storage.
+
+Verified: one rejected record was saved and read back successfully.

@@ -123,6 +123,19 @@ def display_batch(batch, batch_id):
             flush=True,
         )
         if rejected_count:
+            rejection_path = f"/state/rejected-console-v1/batch-{batch_id}"
+            (
+                rejected.select(
+                    "topic", "partition", "offset", "kafka_timestamp",
+                    "raw_json", "validation_error",
+                )
+                .write.mode("overwrite")
+                .parquet(rejection_path)
+            )
+            print(
+                f"Saved rejected records: {rejection_path}",
+                flush=True,
+            )
             rejected.select(
                 "topic", "partition", "offset",
                 "validation_error", "raw_json",
