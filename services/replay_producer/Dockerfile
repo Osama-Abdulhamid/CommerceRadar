@@ -6,9 +6,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-COPY requirements-dev.txt ./requirements-dev.txt
+COPY services/replay_producer/requirements.txt ./requirements.txt
 
-RUN python -m pip install --no-cache-dir -r requirements-dev.txt
+RUN python -m pip install --no-cache-dir -r requirements.txt
 
 RUN groupadd --gid 10001 appuser \
     && useradd --uid 10001 --gid appuser --create-home appuser

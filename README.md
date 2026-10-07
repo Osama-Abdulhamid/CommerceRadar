@@ -26,7 +26,7 @@ Implemented:
 - Local Replay Producer with schema validation and configurable timing.
 - Replay Producer usage documented in services/replay_producer/README.md.
 
-No application or infrastructure services are running yet.
+Kafka and Replay Producer delivery are implemented and tested.
 
 ## Planned Architecture
 
@@ -134,10 +134,10 @@ Run the Replay Producer in a temporary container:
 docker compose run --rm replay-producer
 ```
 
-The producer emits the five sample events and exits.
+The producer delivers five sample events to Kafka and exits. Create the topic first; see the service README.
 The temporary container is removed after execution.
 
-Kafka and the remaining infrastructure services are not implemented yet.
+Kafka delivery is implemented. Spark and the remaining services are pending.
 See services/replay_producer/README.md for details.
 
 ## Data Contract
@@ -227,3 +227,5 @@ Each component will be configured and tested before the next integration.
 - Keep development samples small.
 - Document and version data contract changes before changing producers
   or consumers.
+
+For local Replay Producer execution, also install services/replay_producer/requirements.txt.
