@@ -42,6 +42,16 @@ Console output is for development and is not durable storage.
 
 ## Pending
 
-- Full data-contract validation and invalid-record handling.
+- Durable storage for rejected records.
 - Duplicate-event handling.
 - ClickHouse delivery and recovery tests.
+
+## Schema Validation
+
+Every Kafka payload is checked against the v1 JSON Schema with format checks.
+Invalid records are excluded from the valid-record display.
+Rejection logs include the reason, original JSON, topic, partition, and offset.
+Decimal overflow and unparseable timestamps are also rejected.
+
+Verified: five valid observations accepted and one incomplete record rejected.
+Rejected records are currently displayed in logs only.
