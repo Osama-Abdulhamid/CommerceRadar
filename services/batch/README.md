@@ -1,0 +1,131 @@
+# WDC Batch Cleaning
+
+## Purpose
+
+Clean historical WDC product offers and write Parquet using Spark.
+This job currently runs in local mode inside Docker.
+HDFS integration is not implemented yet.
+
+## Dataset
+
+WDC Product Data Corpus V2, English non-normalized offers.
+
+Download URL:
+https://data.dws.informatik.uni-mannheim.de/largescaleproductcorpus/data/v2_nonnorm/offers_corpus_english_v2_non_norm.json.gz
+
+Verified compressed size: 3,793,679,127 bytes.
+
+Local data directory used for this run:
+E:\CommerceRadarData
+
+WSL equivalent:
+/mnt/e/CommerceRadarData
+
+The full dataset and generated Parquet are not stored in Git.
+Small raw and cleaned samples are included in data/samples.
+
+This is historical catalog data, not a live price feed.
+Do not invent observation timestamps, product URLs or availability.
+
+## Cleaning Rules
+
+The job reuses scripts/clean_wdc_sample.py.
+
+- Normalize whitespace, HTML entities and language-tag syntax.
+- Preserve source record IDs and cluster IDs.
+- Parse prices conservatively.
+- Keep missing or ambiguous prices null and record the reason.
+- Flag missing titles.
+- Preserve each original record inside cleaned_record_json.
+- Fail if a parsed price cannot fit Decimal(18,2).
+
+The JSON record contract is:
+contracts/v1/wdc_cleaned_record.schema.json
+
+The Parquet output contains analytical columns plus
+cleaned_record_json, which embeds the cleaned JSON record
+and its original raw record.
+
+The 1,000-record cleaned sample passed JSON Schema validation.
+The full batch job does not validate every record against that schema.
+
+## Run the Full Dataset
+
+Run from the repository root in Ubuntu WSL.
+Docker Desktop must be running.
+
+Place the downloaded archive in:
+/mnt/e/CommerceRadarData/raw/wdc/
+
+Create output, temporary and log directories:
+
+```bash
+mkdir -p /mnt/e/CommerceRadarData/processed /mnt/e/CommerceRadarData/spark-tmp /mnt/e/CommerceRadarData/logs
+```
+
+Run:
+
+```bash
+set -o pipefail
+
+docker run --rm --user 0:0 \
+  --mount type=bind,source="$PWD",target=/workspace,readonly \
+  --mount type=bind,source=/mnt/e/CommerceRadarData/raw/wdc,target=/input,readonly \
+  --mount type=bind,source=/mnt/e/CommerceRadarData/processed,target=/output \
+  --mount type=bind,source=/mnt/e/CommerceRadarData/spark-tmp,target=/spark-tmp \
+  -e BATCH_INPUT_PATH=/input/offers_corpus_english_v2_non_norm.json.gz \
+  -e BATCH_OUTPUT_PATH=/output/wdc_full_cleaned_v1 \
+  -e PYSPARK_PYTHON=python3 \
+  -e PYSPARK_DRIVER_PYTHON=python3 \
+  --entrypoint /opt/spark/bin/spark-submit \
+  apache/spark:3.5.7-java17-python3 \
+  --master 'local[2]' \
+  --driver-memory 2g \
+  --conf spark.local.dir=/spark-tmp \
+  --conf spark.sql.files.maxRecordsPerFile=250000 \
+  /workspace/services/batch/clean_wdc.py \
+  2>&1 | tee /mnt/e/CommerceRadarData/logs/wdc_full_cleaned_v1.log
+```
+
+The output path must not already exist.
+Use a new output path for a separate run.
+Change the log filename too, to preserve previous logs.
+
+The container runs as root for this Windows-drive bind mount
+because a non-root run encountered permission problems.
+This is a local prototype configuration.
+
+A single gzip input is not splittable, so its reading stage
+uses one task even with local[2].
+
+## Verified Full Run
+
+- Saved records: 16,451,499.
+- Duplicate source ID groups: 0.
+- Parquet written and read back successfully.
+- Shell exit code: 0.
+
+| Price parsing status | Records |
+| --- | ---: |
+| parsed | 1,522,526 |
+| missing | 14,474,182 |
+| missing_amount | 57,315 |
+| unknown_currency | 254,282 |
+| ambiguous_number_format | 88,680 |
+| precision_or_separator_ambiguity | 14,678 |
+| multiple_amounts | 38,079 |
+| conflicting_currencies | 1,493 |
+| negative_amount | 264 |
+
+These counts describe the current parsing rules.
+They do not prove that every parsed price is semantically correct.
+
+## Remaining Work
+
+- Expand cleaning checks using additional real examples.
+- Validate the full output against the batch contract.
+- Reconcile the source record count with the output count.
+- Integrate HDFS storage.
+- Implement product matching and historical aggregations.
+- Load analytical results into ClickHouse.
+- Improve storage layout to reduce duplicated information.
