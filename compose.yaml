@@ -61,9 +61,44 @@ services:
       - commerceradar
     restart: unless-stopped
 
+
+  spark-streaming:
+    build:
+      context: .
+      dockerfile: services/streaming/Dockerfile
+    entrypoint: /opt/spark/bin/spark-submit
+    command:
+      - --master
+      - local[2]
+      - --driver-memory
+      - 1g
+      - --conf
+      - spark.jars.ivy=/ivy
+      - --packages
+      - org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.7
+      - /opt/spark/work-dir/main.py
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
+      KAFKA_TOPIC: ${KAFKA_TOPIC:-product-observations.v1}
+      STREAM_TRIGGER: ${STREAM_TRIGGER:-available_now}
+      PYTHONUNBUFFERED: "1"
+      PYSPARK_PYTHON: python3
+      PYSPARK_DRIVER_PYTHON: python3
+    volumes:
+      - spark-state:/state
+      - spark-ivy:/ivy
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - commerceradar
+    restart: "no"
+
 networks:
   commerceradar:
     driver: bridge
 
 volumes:
   kafka-data:
+  spark-state:
+  spark-ivy:
