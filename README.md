@@ -13,20 +13,42 @@ is outside the current prototype scope.
 
 ## Current Status
 
-Implemented:
-- Local Git repository on the main branch.
-- Project directory structure.
-- Product observation JSON Schema v1.0.
-- Five synthetic sample events in JSONL format.
-- Sample validation script with format and duplicate-ID checks.
-- Pinned development dependencies.
-- Environment variable template.
-- Docker Compose configuration with a Replay Producer service.
-- Replay Producer image built and tested successfully with exit code 0.
-- Local Replay Producer with schema validation and configurable timing.
-- Replay Producer usage documented in services/replay_producer/README.md.
+Implemented and verified:
+- Versioned streaming and WDC batch data contracts.
+- Synthetic replay samples and validation tooling.
+- Dockerized Replay Producer with acknowledged Kafka delivery.
+- Single-node Kafka with three topic partitions and persistent storage.
+- Spark Structured Streaming with contract validation and checkpoints.
+- Invalid streaming records quarantined as Parquet.
+- Direct Adafruit collector: one real product observation per execution.
+- ClickHouse storage and Spark HTTP sink.
+- Verified Adafruit -> Kafka -> Spark -> ClickHouse delivery.
+- ClickHouse persistence tested after restart.
+- WDC dataset: 16,451,499 records cleaned to Parquet.
+- All full-dataset cleaned JSON records validated against the batch contract.
+- Persistent HDFS NameNode and DataNode.
+- Full cleaned Parquet dataset imported into HDFS and read by Spark.
+- HDFS filesystem check reported HEALTHY.
 
-Kafka and Replay Producer delivery are implemented and tested.
+Remaining:
+- Periodic collection and broader source coverage.
+- Price and stock change detection.
+- Product matching and historical analytical aggregations.
+- Batch results loaded into ClickHouse.
+- FastAPI, PostgreSQL, and Power BI.
+- Airflow, Great Expectations, and monitoring.
+- Team handoff and final integration.
+
+Implementation is currently on feature/kafka-streaming.
+The main branch has not yet received these changes.
+
+Service guides:
+- services/replay_producer/README.md
+- services/ingestion/README.md
+- services/streaming/README.md
+- services/batch/README.md
+- infra/hdfs/README.md
+- infra/clickhouse/README.md
 
 ## Planned Architecture
 
@@ -119,7 +141,7 @@ OK: All 5 events match schema v1.0; event IDs are unique.
 Validate the Compose configuration:
 
 ```bash
-docker compose config
+docker compose config -q
 ```
 
 Build the Replay Producer image:
@@ -137,7 +159,7 @@ docker compose run --rm replay-producer
 The producer delivers five sample events to Kafka and exits. Create the topic first; see the service README.
 The temporary container is removed after execution.
 
-Kafka delivery is implemented. Spark and the remaining services are pending.
+Kafka, Spark streaming, HDFS, and ClickHouse are implemented. Follow the service guides for startup and initialization.
 See services/replay_producer/README.md for details.
 
 ## Data Contract
@@ -164,8 +186,10 @@ Rules:
 The validator checks schema validity, event fields, formats, and duplicate
 event IDs within the sample file. This is not pipeline-wide deduplication.
 
-All sample events are synthetic. Prices are illustrative and product URLs
-are placeholders.
+The five replay sample events are synthetic; their prices are illustrative
+and URLs are placeholders. The WDC samples contain historical source data.
+The Adafruit collector obtains real observations. WDC records use a separate
+batch contract; missing timestamps, stock, or URLs are not invented.
 
 ## Directory Layout
 
@@ -191,7 +215,16 @@ are placeholders.
 Git does not track empty directories. Some planned directories will not
 appear in a fresh clone until files are added.
 
-Database and HDFS runtime storage will be configured using Docker volumes.
+Kafka, Spark state, and ClickHouse use Docker volumes. HDFS uses persistent
+bind mounts configured through HDFS_STORAGE_ROOT. In the verified setup,
+large datasets and HDFS storage are on E, and Docker Desktop's disk image
+is at E:/DockerDesktopData. Each teammate must configure local paths.
+
+Before validating Compose, fill required .env settings, including a private
+CLICKHOUSE_PASSWORD, and create the HDFS storage directories. Follow the
+HDFS guide before starting its services. Create the Kafka topic before
+sending events and the ClickHouse table before starting the streaming sink.
+Use docker compose config -q to validate without displaying resolved secrets.
 
 ## Team Responsibilities
 
