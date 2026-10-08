@@ -111,7 +111,85 @@ and redistribution has not been established.
 Remaining:
 - Clarify permitted project use before scheduled collection.
 - Implement configurable product selection and polling.
-- Capture collection timestamps directly.
-- Add bounded retries and preserve event identity during delivery retries.
-- Package the collector for Docker Compose.
+- Review delivery failure recovery and duplicate handling.
 - Connect valid streaming observations to ClickHouse.
+
+## Direct Adafruit Collector
+
+`adafruit_collector.py` fetches one product directly from the API,
+normalizes it using the adapter, validates the observation, and publishes
+it to Kafka with acknowledged delivery.
+
+Each invocation makes one HTTP request and then exits.
+Scheduled polling is not implemented.
+
+observed_at is recorded in UTC immediately after receiving the response.
+It represents collection time, not the time the store changed its data.
+
+Configuration:
+- ADAFRUIT_PRODUCT_ID: product ID; default 5813.
+- ADAFRUIT_CURRENCY: required locally; Compose defaults to verified USD.
+- KAFKA_BOOTSTRAP_SERVERS: required locally; Compose uses kafka:9092.
+- KAFKA_TOPIC: defaults to product-observations.v1.
+
+The collector requires curl and the packages in
+services/ingestion/requirements.txt.
+
+### Local Execution
+
+```bash
+python -m pip install -r services/ingestion/requirements.txt
+ADAFRUIT_PRODUCT_ID=5813 ADAFRUIT_CURRENCY=USD KAFKA_BOOTSTRAP_SERVERS=localhost:19092 python services/ingestion/adafruit_collector.py
+```
+
+### Docker Execution
+
+Kafka must be available and the configured topic must exist.
+
+```bash
+docker compose --profile ingestion config -q
+docker compose --profile ingestion build adafruit-collector
+docker compose --profile ingestion run --rm adafruit-collector
+```
+
+The container runs as UID/GID 10001.
+Compose waits for Kafka to become healthy.
+The ingestion profile keeps the collector optional.
+The temporary container is removed after it exits.
+
+To read another product:
+
+```bash
+docker compose --profile ingestion run --rm -e ADAFRUIT_PRODUCT_ID=5812 adafruit-collector
+```
+
+Respect the documented aggregate limit of five source requests per minute
+or fewer, including manual tests and parallel collectors.
+
+### Failure and Delivery Behavior
+
+- HTTP requests have a 30-second timeout and no automatic HTTP retries.
+- The returned product ID must match the requested ID.
+- Invalid observations are not published.
+- Kafka uses acks=all and up to three internal retries.
+- A single event_id is retained throughout one delivery attempt and its
+  internal Kafka retries.
+- Restarting the program creates a new observation and event_id.
+- Kafka delivery can still produce duplicates.
+- Failed collection or delivery returns a nonzero exit code.
+
+### Verified Docker Integration
+
+On 2026-10-08, the Docker collector fetched product 5813 and delivered an
+observation to Kafka partition 2, offset 6.
+
+Spark processed the same event in batch 9:
+- Valid records: 1.
+- Rejected records: 0.
+- Price: 200.00 USD.
+- Availability: in_stock.
+- Collection timestamp: 2026-10-08T18:01:39Z.
+
+This verifies direct API → Docker collector → Kafka → Spark.
+ClickHouse persistence, periodic polling, and source-use clarification
+remain outstanding.

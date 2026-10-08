@@ -1,6 +1,24 @@
 name: ${COMPOSE_PROJECT_NAME:-commerceradar}
 
 services:
+  adafruit-collector:
+    profiles:
+      - ingestion
+    build:
+      context: .
+      dockerfile: services/ingestion/Dockerfile
+    environment:
+      ADAFRUIT_PRODUCT_ID: "${ADAFRUIT_PRODUCT_ID:-5813}"
+      ADAFRUIT_CURRENCY: "${ADAFRUIT_CURRENCY:-USD}"
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_TOPIC: ${KAFKA_TOPIC:-product-observations.v1}
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - commerceradar
+    restart: "no"
+
   replay-producer:
     build:
       context: .
