@@ -47,9 +47,11 @@ Service guides:
 - services/ingestion/README.md
 - services/streaming/README.md
 - services/batch/README.md
+- services/api/README.md
 - infra/hdfs/README.md
 - infra/clickhouse/README.md
 - docs/batch_intelligence.md
+- docs/member4_visualization_strategy.md
 
 ## Planned Architecture
 
@@ -72,6 +74,10 @@ datasets stored in HDFS.
 Application:
 - FastAPI: backend API.
 - PostgreSQL: users, settings, and alert rules only.
+
+Implemented API:
+FastAPI reads ClickHouse batch product-intelligence tables and the streaming
+observation table. Power BI and visualization design remain Member 4 work.
 
 Supporting components:
 - Airflow: orchestration.

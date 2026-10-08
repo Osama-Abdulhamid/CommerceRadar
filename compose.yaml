@@ -152,6 +152,24 @@ services:
       - commerceradar
     restart: "no"
 
+  api:
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+    environment:
+      CLICKHOUSE_HTTP_URL: http://clickhouse:8123
+      CLICKHOUSE_DB: ${CLICKHOUSE_DB:-commerceradar}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-commerceradar}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?Set CLICKHOUSE_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:${API_PORT:-18000}:8000"
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    networks:
+      - commerceradar
+    restart: unless-stopped
+
   namenode:
     image: ${HADOOP_IMAGE:-apache/hadoop:3.4.1}
     hostname: namenode
