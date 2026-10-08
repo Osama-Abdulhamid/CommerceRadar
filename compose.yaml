@@ -1,6 +1,40 @@
 name: ${COMPOSE_PROJECT_NAME:-commerceradar}
 
 services:
+  clickhouse:
+    image: ${CLICKHOUSE_IMAGE:?Set CLICKHOUSE_IMAGE in .env}
+    environment:
+      CLICKHOUSE_DB: ${CLICKHOUSE_DB:-commerceradar}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-commerceradar}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?Set CLICKHOUSE_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:${CLICKHOUSE_HTTP_PORT:-18123}:8123"
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - type: bind
+        source: ./infra/clickhouse/config.xml
+        target: /etc/clickhouse-server/config.d/commerceradar.xml
+        read_only: true
+        bind:
+          create_host_path: false
+    mem_limit: 2g
+    cpus: 2.0
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'clickhouse-client --user "$$CLICKHOUSE_USER" --password "$$CLICKHOUSE_PASSWORD" --query "SELECT 1"'
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    networks:
+      - commerceradar
+    restart: unless-stopped
+
   adafruit-collector:
     profiles:
       - ingestion
@@ -102,11 +136,17 @@ services:
       PYTHONUNBUFFERED: "1"
       PYSPARK_PYTHON: python3
       PYSPARK_DRIVER_PYTHON: python3
+      CLICKHOUSE_HTTP_URL: http://clickhouse:8123
+      CLICKHOUSE_DB: ${CLICKHOUSE_DB:-commerceradar}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-commerceradar}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?Set CLICKHOUSE_PASSWORD in .env}
     volumes:
       - spark-state:/state
       - spark-ivy:/ivy
     depends_on:
       kafka:
+        condition: service_healthy
+      clickhouse:
         condition: service_healthy
     networks:
       - commerceradar
@@ -178,3 +218,4 @@ volumes:
   kafka-data:
   spark-state:
   spark-ivy:
+  clickhouse-data:

@@ -1,0 +1,15 @@
+<clickhouse>
+    <max_server_memory_usage>1500000000</max_server_memory_usage>
+
+    <mark_cache_size>67108864</mark_cache_size>
+    <uncompressed_cache_size>67108864</uncompressed_cache_size>
+
+    <logger>
+        <level>information</level>
+        <console>true</console>
+        <size>10M</size>
+        <count>2</count>
+        <log>/tmp/clickhouse-server.log</log>
+        <errorlog>/tmp/clickhouse-server.err.log</errorlog>
+    </logger>
+</clickhouse>

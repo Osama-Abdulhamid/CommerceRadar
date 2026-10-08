@@ -1,6 +1,7 @@
-"""Read Kafka observations and display typed records."""
+"""Validate Kafka observations and persist valid records to ClickHouse."""
 
 import os
+from clickhouse_sink import write_observations
 import json
 from pathlib import Path
 from jsonschema import Draft202012Validator, FormatChecker
@@ -35,6 +36,7 @@ raw = (
     .option("kafka.bootstrap.servers", os.environ["KAFKA_BOOTSTRAP_SERVERS"])
     .option("subscribe", os.environ["KAFKA_TOPIC"])
     .option("startingOffsets", "earliest")
+    .option("maxOffsetsPerTrigger", "1000")
     .option("failOnDataLoss", "true")
     .load()
 )
@@ -123,7 +125,7 @@ def display_batch(batch, batch_id):
             flush=True,
         )
         if rejected_count:
-            rejection_path = f"/state/rejected-console-v1/batch-{batch_id}"
+            rejection_path = f"/state/rejected-clickhouse-v1/batch-{batch_id}"
             (
                 rejected.select(
                     "topic", "partition", "offset", "kafka_timestamp",
@@ -141,7 +143,14 @@ def display_batch(batch, batch_id):
                 "validation_error", "raw_json",
             ).show(100, truncate=False)
 
-        batch.filter(F.col("validation_error").isNull()).select(
+        valid = batch.filter(F.col("validation_error").isNull())
+        written = write_observations(valid)
+        print(
+            f"ClickHouse batch={batch_id} written={written}",
+            flush=True,
+        )
+
+        valid.select(
             "event_id", "source", "source_product_id",
             "price_decimal", "currency", "observed_at_utc",
             "availability", "partition", "offset",
@@ -152,7 +161,7 @@ def display_batch(batch, batch_id):
 writer = (
     typed.writeStream
     .foreachBatch(display_batch)
-    .option("checkpointLocation", "/state/console-v1")
+    .option("checkpointLocation", "/state/clickhouse-v1")
 )
 
 if os.getenv("STREAM_TRIGGER", "available_now") == "available_now":

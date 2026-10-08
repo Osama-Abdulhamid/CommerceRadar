@@ -68,3 +68,33 @@ Records processed before this feature are not backfilled.
 Storage is local to this prototype; a distributed deployment needs shared storage.
 
 Verified: one rejected record was saved and read back successfully.
+
+## Current ClickHouse Sink
+
+This section supersedes earlier console-only behavior.
+
+Valid observations are now written to ClickHouse over HTTP.
+See infra/clickhouse/README.md for setup and verified results.
+
+Required environment: CLICKHOUSE_HTTP_URL, CLICKHOUSE_DB,
+CLICKHOUSE_USER and CLICKHOUSE_PASSWORD.
+Compose waits for Kafka and ClickHouse to become healthy.
+
+Checkpoint: /state/clickhouse-v1.
+Rejected records: /state/rejected-clickhouse-v1/batch-<batch_id>.
+Older console checkpoints are preserved.
+
+Kafka micro-batches are limited to 1000 offsets.
+HTTP requests contain at most 500 rows and 1,000,000 payload bytes.
+Insertion errors fail the batch; partial writes may be retried.
+ReplacingMergeTree with FINAL provides logical deduplication
+for identical sorting keys, not exactly-once delivery.
+
+Run the available backlog and exit:
+    STREAM_TRIGGER=available_now docker compose up -d spark-streaming
+
+Run repeated five-second micro-batches:
+    STREAM_TRIGGER=continuous docker compose up -d spark-streaming
+
+The initial batch delivered 24 valid records and rejected 2 test records.
+A fresh Adafruit event was verified in ClickHouse by its exact event ID.
