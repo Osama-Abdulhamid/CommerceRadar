@@ -423,14 +423,41 @@ def write_outputs(outputs: dict[str, DataFrame], output_path: str, mode: str) ->
         frame.write.mode(mode).parquet(f"{output_path.rstrip('/')}/{name}")
 
 
+def read_cleaned_input(spark: SparkSession, input_path: str, input_format: str) -> DataFrame:
+    """Read cleaned WDC input from production Parquet or JSONL samples."""
+    normalized_format = input_format.lower()
+    if normalized_format == "auto":
+        lowered_path = input_path.lower()
+        normalized_format = "json" if lowered_path.endswith((".json", ".jsonl")) else "parquet"
+
+    if normalized_format == "parquet":
+        return spark.read.parquet(input_path)
+    if normalized_format == "json":
+        lines = spark.read.text(input_path)
+        return lines.select(
+            F.get_json_object("value", "$.source_record_id").alias("source_record_id"),
+            F.get_json_object("value", "$.cluster_id").alias("cluster_id"),
+            F.get_json_object("value", "$.title").alias("title"),
+            F.get_json_object("value", "$.brand").alias("brand"),
+            F.get_json_object("value", "$.category").alias("category"),
+            F.get_json_object("value", "$.price").alias("price"),
+            F.get_json_object("value", "$.currency").alias("currency"),
+            F.get_json_object("value", "$.price_parse_status").alias("price_parse_status"),
+            F.col("value").alias("cleaned_record_json"),
+        )
+
+    raise ValueError("input_format must be one of: auto, parquet, json")
+
+
 def run_pipeline(
     spark: SparkSession,
     input_path: str,
     output_path: str,
     threshold: float,
     write_mode: str,
+    input_format: str = "auto",
 ) -> dict[str, DataFrame]:
-    cleaned = spark.read.parquet(input_path)
+    cleaned = read_cleaned_input(spark, input_path, input_format)
     input_count = cleaned.count()
     normalized = normalize_products(cleaned)
     candidates = generate_candidate_pairs(normalized)
@@ -458,6 +485,12 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", default=os.getenv("BATCH_INPUT_PATH"), required=False)
     parser.add_argument("--output", default=os.getenv("BATCH_OUTPUT_PATH"), required=False)
+    parser.add_argument(
+        "--input-format",
+        choices=("auto", "parquet", "json"),
+        default=os.getenv("BATCH_INPUT_FORMAT", "auto"),
+        help="Use parquet for production outputs or json for cleaned JSONL samples.",
+    )
     parser.add_argument("--threshold", type=float, default=float(os.getenv("MATCH_THRESHOLD", "0.65")))
     parser.add_argument("--write-mode", default=os.getenv("BATCH_WRITE_MODE", "errorifexists"))
     args = parser.parse_args(argv)
@@ -479,6 +512,7 @@ def main(argv: Iterable[str] | None = None) -> int:
             output_path=args.output,
             threshold=args.threshold,
             write_mode=args.write_mode,
+            input_format=args.input_format,
         )
         print("OK: Batch product intelligence outputs written.", flush=True)
         outputs["matching_evaluation"].show(truncate=False)

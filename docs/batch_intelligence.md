@@ -210,6 +210,21 @@ docker run --rm --user 0:0 \
 
 Run against a local cleaned Parquet sample by replacing `BATCH_INPUT_PATH` and `BATCH_OUTPUT_PATH` with local bind-mounted paths.
 
+Run against the committed cleaned JSONL sample:
+
+```bash
+docker run --rm --user 0:0 \
+  --mount type=bind,source="$PWD",target=/workspace \
+  --entrypoint /opt/spark/bin/spark-submit \
+  apache/spark:3.5.7-java17-python3 \
+  --master local[1] \
+  /workspace/services/batch/product_intelligence.py \
+  --input /workspace/data/samples/wdc_english_v2.cleaned.1000.jsonl \
+  --input-format json \
+  --output /workspace/data/processed/batch_intelligence_wdc_sample \
+  --write-mode overwrite
+```
+
 Run unit tests:
 
 ```bash
