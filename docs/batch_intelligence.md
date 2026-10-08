@@ -174,6 +174,25 @@ Create the batch tables:
 docker compose exec -T clickhouse sh -c 'clickhouse-client --user "$CLICKHOUSE_USER" --password "$CLICKHOUSE_PASSWORD" --multiquery' < infra/clickhouse/002_batch_product_intelligence.sql
 ```
 
+Load generated batch Parquet outputs into ClickHouse:
+
+```bash
+docker run --rm --user 0:0 \
+  --network commerceradar_commerceradar \
+  --mount type=bind,source="$PWD",target=/workspace,readonly \
+  -e CLICKHOUSE_HTTP_URL=http://clickhouse:8123 \
+  -e CLICKHOUSE_DB=commerceradar \
+  -e CLICKHOUSE_USER=commerceradar \
+  -e CLICKHOUSE_PASSWORD="$CLICKHOUSE_PASSWORD" \
+  --entrypoint /opt/spark/bin/spark-submit \
+  apache/spark:3.5.7-java17-python3 \
+  --master local[1] \
+  --conf spark.hadoop.fs.defaultFS=hdfs://namenode:8020 \
+  /workspace/services/batch/load_clickhouse.py \
+  --input-base hdfs://namenode:8020/commerceradar/curated/wdc/batch_product_intelligence_sample_v1 \
+  --truncate
+```
+
 Sample verification queries:
 
 ```sql
