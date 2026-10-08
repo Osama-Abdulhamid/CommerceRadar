@@ -458,7 +458,7 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", default=os.getenv("BATCH_INPUT_PATH"), required=False)
     parser.add_argument("--output", default=os.getenv("BATCH_OUTPUT_PATH"), required=False)
-    parser.add_argument("--threshold", type=float, default=float(os.getenv("MATCH_THRESHOLD", "0.82")))
+    parser.add_argument("--threshold", type=float, default=float(os.getenv("MATCH_THRESHOLD", "0.65")))
     parser.add_argument("--write-mode", default=os.getenv("BATCH_WRITE_MODE", "errorifexists"))
     args = parser.parse_args(argv)
     if not args.input:

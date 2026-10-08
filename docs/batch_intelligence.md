@@ -113,7 +113,7 @@ Similarity features:
 - Category agreement.
 
 Default threshold:
-- `MATCH_THRESHOLD=0.82`.
+- `MATCH_THRESHOLD=0.65`.
 
 Canonical IDs:
 - Deterministic SHA-256 IDs using the smallest record ID seen in a matched pair neighborhood.
@@ -196,7 +196,7 @@ docker run --rm --user 0:0 \
   --mount type=bind,source=/mnt/e/CommerceRadarData/spark-tmp,target=/spark-tmp \
   -e BATCH_INPUT_PATH=hdfs://namenode:8020/commerceradar/cleaned/wdc/wdc_full_cleaned_v1 \
   -e BATCH_OUTPUT_PATH=hdfs://namenode:8020/commerceradar/curated/wdc/batch_product_intelligence_v1 \
-  -e MATCH_THRESHOLD=0.82 \
+  -e MATCH_THRESHOLD=0.65 \
   -e PYSPARK_PYTHON=python3 \
   -e PYSPARK_DRIVER_PYTHON=python3 \
   --entrypoint /opt/spark/bin/spark-submit \
