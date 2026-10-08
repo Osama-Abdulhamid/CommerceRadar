@@ -33,8 +33,8 @@ Implemented and verified:
 Remaining:
 - Periodic collection and broader source coverage.
 - Price and stock change detection.
-- Product matching and historical analytical aggregations.
-- Batch results loaded into ClickHouse.
+- Full-dataset execution of product matching and historical analytical aggregations.
+- Loading generated batch Parquet outputs into ClickHouse.
 - FastAPI, PostgreSQL, and Power BI.
 - Airflow, Great Expectations, and monitoring.
 - Team handoff and final integration.
@@ -49,6 +49,7 @@ Service guides:
 - services/batch/README.md
 - infra/hdfs/README.md
 - infra/clickhouse/README.md
+- docs/batch_intelligence.md
 
 ## Planned Architecture
 
@@ -59,6 +60,11 @@ Data Sources -> Kafka -> Spark Structured Streaming -> ClickHouse
 Batch:
 Raw Data -> HDFS -> Parquet datasets -> Spark Batch -> ClickHouse
 -> Power BI
+
+Implemented batch intelligence:
+Cleaned WDC Parquet -> Product normalization -> Candidate blocking
+-> Similarity scoring -> Canonical product groups -> Historical price/source
+analytics -> ClickHouse-ready batch tables.
 
 Parquet is a file format. Batch processing will read and write Parquet
 datasets stored in HDFS.

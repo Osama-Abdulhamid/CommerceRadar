@@ -125,10 +125,61 @@ They do not prove that every parsed price is semantically correct.
 ## Remaining Work
 
 - Expand cleaning checks using additional real examples.
-- Integrate HDFS storage.
-- Implement product matching and historical aggregations.
-- Load analytical results into ClickHouse.
+- Run product matching and historical aggregations against the full local/HDFS dataset.
+- Load generated analytical Parquet outputs into ClickHouse.
 - Improve storage layout to reduce duplicated information.
+
+## Product Intelligence
+
+Member 3 batch intelligence is implemented in:
+
+```text
+services/batch/product_intelligence.py
+```
+
+The job reads cleaned WDC Parquet, normalizes titles, brands and categories,
+generates blocked candidate pairs, scores candidate similarity, assigns
+deterministic canonical product IDs and writes curated analytical Parquet
+outputs.
+
+Outputs:
+
+```text
+product_matches
+matching_evaluation
+product_history
+product_price_summary
+product_source_summary
+```
+
+Availability analytics are intentionally omitted because the cleaned WDC
+contract does not contain a trustworthy availability field. Latest-price
+analytics are also omitted because the cleaned WDC records do not include a
+trustworthy observation timestamp.
+
+Run against HDFS:
+
+```bash
+docker run --rm --user 0:0 \
+  --network commerceradar_commerceradar \
+  --mount type=bind,source="$PWD",target=/workspace,readonly \
+  --mount type=bind,source=/mnt/e/CommerceRadarData/spark-tmp,target=/spark-tmp \
+  -e BATCH_INPUT_PATH=hdfs://namenode:8020/commerceradar/cleaned/wdc/wdc_full_cleaned_v1 \
+  -e BATCH_OUTPUT_PATH=hdfs://namenode:8020/commerceradar/curated/wdc/batch_product_intelligence_v1 \
+  -e MATCH_THRESHOLD=0.82 \
+  -e PYSPARK_PYTHON=python3 \
+  -e PYSPARK_DRIVER_PYTHON=python3 \
+  --entrypoint /opt/spark/bin/spark-submit \
+  apache/spark:3.5.7-java17-python3 \
+  --master local[2] \
+  --driver-memory 2g \
+  --conf spark.local.dir=/spark-tmp \
+  --conf spark.hadoop.fs.defaultFS=hdfs://namenode:8020 \
+  /workspace/services/batch/product_intelligence.py
+```
+
+See `docs/batch_intelligence.md` for the audit, methodology, validation
+checks, ClickHouse DDL and reproduction notes.
 
 ## Full Dataset Validation
 
