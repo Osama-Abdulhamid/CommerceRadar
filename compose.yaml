@@ -94,6 +94,64 @@ services:
       - commerceradar
     restart: "no"
 
+  namenode:
+    image: ${HADOOP_IMAGE:-apache/hadoop:3.4.1}
+    hostname: namenode
+    user: "0:0"
+    entrypoint: /bin/bash
+    command:
+      - -ec
+      - |
+        if [ ! -f /data/name/current/VERSION ]; then
+          if [ -n "$$(find /data/name -mindepth 1 -maxdepth 1 -print -quit)" ]; then
+            echo "NameNode directory is not empty; refusing to format."
+            exit 1
+          fi
+          hdfs namenode -format -nonInteractive
+        fi
+        exec hdfs namenode
+    environment:
+      HADOOP_HOME: /opt/hadoop
+      HADOOP_CONF_DIR: /opt/hadoop/etc/hadoop
+      HADOOP_HEAPSIZE_MAX: "512"
+    ports:
+      - "127.0.0.1:${HDFS_UI_PORT:-9870}:9870"
+    volumes:
+      - ./infra/hdfs/core-site.xml:/opt/hadoop/etc/hadoop/core-site.xml:ro
+      - ./infra/hdfs/hdfs-site.xml:/opt/hadoop/etc/hadoop/hdfs-site.xml:ro
+      - ${HDFS_STORAGE_ROOT:?Set HDFS_STORAGE_ROOT in .env}/namenode:/data/name
+      - ${COMMERCE_DATA_ROOT:?Set COMMERCE_DATA_ROOT in .env}:/external:ro
+    healthcheck:
+      test: ["CMD", "hdfs", "dfs", "-ls", "/"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    networks:
+      - commerceradar
+    restart: unless-stopped
+
+  datanode:
+    image: ${HADOOP_IMAGE:-apache/hadoop:3.4.1}
+    hostname: datanode
+    user: "0:0"
+    entrypoint: /bin/bash
+    command: ["-ec", "exec hdfs datanode"]
+    environment:
+      HADOOP_HOME: /opt/hadoop
+      HADOOP_CONF_DIR: /opt/hadoop/etc/hadoop
+      HADOOP_HEAPSIZE_MAX: "512"
+    volumes:
+      - ./infra/hdfs/core-site.xml:/opt/hadoop/etc/hadoop/core-site.xml:ro
+      - ./infra/hdfs/hdfs-site.xml:/opt/hadoop/etc/hadoop/hdfs-site.xml:ro
+      - ${HDFS_STORAGE_ROOT:?Set HDFS_STORAGE_ROOT in .env}/datanode:/data/data
+    depends_on:
+      namenode:
+        condition: service_healthy
+    networks:
+      - commerceradar
+    restart: unless-stopped
+
 networks:
   commerceradar:
     driver: bridge
