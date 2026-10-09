@@ -2,6 +2,8 @@
 
 import json
 import logging
+import math
+import time
 import os
 import subprocess
 import sys
@@ -15,7 +17,7 @@ from adafruit import ROOT, normalize
 LOGGER = logging.getLogger("adafruit_collector")
 
 
-def main():
+def collect_once():
     producer = None
     try:
         product_id = os.getenv("ADAFRUIT_PRODUCT_ID", "5813").strip()
@@ -128,6 +130,49 @@ def main():
                 producer.close(timeout=10)
             except Exception as error:
                 LOGGER.warning("Producer cleanup failed: %s", error)
+
+
+def main():
+    try:
+        interval = float(os.getenv("ADAFRUIT_POLL_SECONDS", "60"))
+        cycles = int(os.getenv("ADAFRUIT_MAX_CYCLES", "1"))
+        if not math.isfinite(interval) or interval < 60:
+            raise ValueError("ADAFRUIT_POLL_SECONDS must be at least 60")
+        if cycles < 0:
+            raise ValueError("ADAFRUIT_MAX_CYCLES must be non-negative")
+
+        attempts = 0
+        consecutive_failures = 0
+
+        # 1 means one collection; 0 means continuous polling.
+        while cycles == 0 or attempts < cycles:
+            attempts += 1
+            LOGGER.info("Collection cycle=%s", attempts)
+            status = collect_once()
+
+            if status == 130:
+                return 130
+            if status:
+                consecutive_failures += 1
+                if consecutive_failures >= 3:
+                    LOGGER.error("Stopping after three consecutive failures")
+                    return 1
+            else:
+                consecutive_failures = 0
+
+            if cycles and attempts >= cycles:
+                return status
+
+            LOGGER.info("Next collection in %s seconds", interval)
+            time.sleep(interval)
+
+        return 0
+    except KeyboardInterrupt:
+        LOGGER.info("Periodic collection stopped by user")
+        return 130
+    except (ValueError, OverflowError) as error:
+        LOGGER.error("Invalid polling configuration: %s", error)
+        return 1
 
 
 if __name__ == "__main__":
