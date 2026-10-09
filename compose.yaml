@@ -2,6 +2,34 @@ name: ${COMPOSE_PROJECT_NAME:-commerceradar}
 
 services:
 
+  airflow:
+    image: apache/airflow:2.11.0-python3.12
+    user: "50000:0"
+    command: standalone
+    environment:
+      INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_KEY:?Set INTERNAL_SERVICE_KEY in .env}
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__PARALLELISM: "2"
+      AIRFLOW__CORE__MAX_ACTIVE_TASKS_PER_DAG: "2"
+      AIRFLOW__WEBSERVER__WORKERS: "1"
+      AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "false"
+      AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_SECRET_KEY:?Set AIRFLOW_SECRET_KEY in .env}
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: sqlite:////opt/airflow/airflow.db
+    ports:
+      - "127.0.0.1:18080:8080"
+    volumes:
+      - airflow-data:/opt/airflow
+      - ./orchestration/airflow/dags:/opt/airflow/dags:ro
+    mem_limit: 2g
+    cpus: 2.0
+    depends_on:
+      api:
+        condition: service_started
+    networks:
+      - commerceradar
+    restart: unless-stopped
+
+
   postgres:
     image: ${POSTGRES_IMAGE:-postgres:17-bookworm}
     environment:
@@ -182,6 +210,7 @@ services:
       context: .
       dockerfile: services/api/Dockerfile
     environment:
+      INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_KEY:?Set INTERNAL_SERVICE_KEY in .env}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: "5432"
       POSTGRES_DB: ${POSTGRES_DB:-commerceradar_app}
@@ -265,6 +294,7 @@ networks:
     driver: bridge
 
 volumes:
+  airflow-data:
   postgres-data:
   kafka-data:
   spark-state:

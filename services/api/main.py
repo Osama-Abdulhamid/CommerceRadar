@@ -327,3 +327,45 @@ app.include_router(accounts_router)
 
 from alert_routes import router as alert_router
 app.include_router(alert_router)
+
+
+@app.post("/internal/alerts/evaluate")
+def evaluate_all_alerts(
+    x_service_key: str | None = __import__("fastapi").Header(default=None),
+):
+    import hmac
+    import os
+    from alert_engine import evaluate_user
+    from postgres import connection
+
+    expected = os.environ.get("INTERNAL_SERVICE_KEY", "")
+    if not expected or not hmac.compare_digest(x_service_key or "", expected):
+        raise HTTPException(status_code=401, detail="Invalid service key")
+
+    with connection() as conn:
+        users = conn.execute(
+            """
+            SELECT DISTINCT r.user_id
+            FROM alert_rules r
+            JOIN user_settings s ON s.user_id = r.user_id
+            WHERE r.enabled AND s.alerts_enabled
+            """
+        ).fetchall()
+
+    created = 0
+    checked = 0
+    try:
+        for user in users:
+            result = evaluate_user(user["user_id"])
+            created += result["alerts_created"]
+            checked += result["rules_checked"]
+    except ClickHouseError as error:
+        raise HTTPException(
+            status_code=503, detail="Analytics database is unavailable",
+        ) from error
+
+    return {
+        "users_checked": len(users),
+        "rules_checked": checked,
+        "alerts_created": created,
+    }
