@@ -236,3 +236,75 @@ def list_streaming_observations(
         OFFSET {safe_offset}
         """,
     )
+
+
+@app.get("/wdc/overview")
+def wdc_overview(client: ClickHouseClient = Depends(get_clickhouse)):
+    return run_query(
+        client,
+        """
+        SELECT count() AS total_offers,
+               countIf(price_parse_status = 'parsed' AND price IS NOT NULL)
+                   AS priced_offers,
+               uniqExact(category) AS categories
+        FROM commerceradar.wdc_cleaned_offers
+        """,
+    )[0]
+
+
+@app.get("/wdc/quality")
+def wdc_quality(client: ClickHouseClient = Depends(get_clickhouse)):
+    return run_query(
+        client,
+        "SELECT * FROM commerceradar.wdc_quality_summary "
+        "ORDER BY offer_count DESC",
+    )
+
+
+@app.get("/wdc/categories")
+def wdc_categories(client: ClickHouseClient = Depends(get_clickhouse)):
+    return run_query(
+        client,
+        "SELECT * FROM commerceradar.wdc_category_summary "
+        "ORDER BY offer_count DESC",
+    )
+
+
+@app.get("/wdc/category-prices")
+def wdc_category_prices(
+    currency: str | None = Query(default=None, min_length=3, max_length=3),
+    client: ClickHouseClient = Depends(get_clickhouse),
+):
+    where = (
+        f"WHERE currency = {sql_string(currency.upper())}"
+        if currency else ""
+    )
+    return run_query(
+        client,
+        "SELECT * FROM commerceradar.wdc_category_price_summary "
+        f"{where} ORDER BY priced_offer_count DESC",
+    )
+
+
+@app.get("/streaming/current")
+def streaming_current(
+    limit: int = Query(default=50, ge=1, le=500),
+    client: ClickHouseClient = Depends(get_clickhouse),
+):
+    return run_query(
+        client,
+        "SELECT * FROM commerceradar.current_products "
+        f"ORDER BY observed_at DESC, source, source_product_id LIMIT {limit}",
+    )
+
+
+@app.get("/streaming/changes")
+def streaming_changes(
+    limit: int = Query(default=50, ge=1, le=500),
+    client: ClickHouseClient = Depends(get_clickhouse),
+):
+    return run_query(
+        client,
+        "SELECT * FROM commerceradar.product_changes "
+        f"ORDER BY observed_at DESC, event_id LIMIT {limit}",
+    )
