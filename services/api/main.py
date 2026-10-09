@@ -24,7 +24,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=False,
-    allow_methods=["GET"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
     allow_headers=["*"],
 )
 
@@ -308,3 +308,22 @@ def streaming_changes(
         "SELECT * FROM commerceradar.product_changes "
         f"ORDER BY observed_at DESC, event_id LIMIT {limit}",
     )
+
+
+@app.get("/health/postgres")
+def postgres_health():
+    from postgres import connection
+
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT current_database() AS database, 1 AS connected"
+        ).fetchone()
+    return {"status": "ok", **row}
+
+
+from accounts import router as accounts_router
+app.include_router(accounts_router)
+
+
+from alert_routes import router as alert_router
+app.include_router(alert_router)
