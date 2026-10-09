@@ -1,3 +1,5 @@
+> Current integration behavior and verified limitations: see docs/batch_integration_verification.md. The loader uses staging replacement; --truncate is disabled.
+
 # WDC Batch Cleaning
 
 ## Purpose

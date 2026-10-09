@@ -227,20 +227,75 @@ def build_product_matches(normalized: DataFrame, scored_pairs: DataFrame) -> Dat
             )
         )
     )
+    # Propagate the smallest ID through every connected match group.
+    edges = endpoints.select(
+        "source_record_id", "peer_source_record_id"
+    ).distinct().localCheckpoint(eager=True)
+
+    labels = normalized.select("source_record_id").distinct().withColumn(
+        "canonical_seed", F.col("source_record_id")
+    ).localCheckpoint(eager=True)
+
+    max_iterations = int(os.getenv("MATCH_MAX_ITERATIONS", "100"))
+    if max_iterations < 1:
+        raise ValueError("MATCH_MAX_ITERATIONS must be positive")
+
+    for iteration in range(max_iterations):
+        neighbor_labels = (
+            edges.alias("edge")
+            .join(
+                labels.alias("label"),
+                F.col("edge.peer_source_record_id")
+                == F.col("label.source_record_id"),
+                "inner",
+            )
+            .select(
+                F.col("edge.source_record_id").alias("source_record_id"),
+                F.col("label.canonical_seed").alias("canonical_seed"),
+            )
+        )
+
+        updated = (
+            labels.unionByName(neighbor_labels)
+            .groupBy("source_record_id")
+            .agg(F.min("canonical_seed").alias("canonical_seed"))
+            .localCheckpoint(eager=True)
+        )
+
+        changed = (
+            labels.alias("old")
+            .join(updated.alias("new"), "source_record_id")
+            .filter(
+                F.col("old.canonical_seed") != F.col("new.canonical_seed")
+            )
+            .limit(1).count()
+        )
+
+        labels.unpersist()
+        labels = updated
+
+        if not changed:
+            print(
+                f"Matching groups converged after {iteration + 1} iterations",
+                flush=True,
+            )
+            break
+    else:
+        labels.unpersist()
+        edges.unpersist()
+        raise RuntimeError(
+            "Matching groups did not converge; no outputs were written"
+        )
+
+    edges.unpersist()
+
     representatives = endpoints.groupBy("source_record_id").agg(
-        F.min("peer_source_record_id").alias("min_peer_source_record_id"),
         F.max("match_confidence").alias("pair_match_confidence"),
     )
 
     return (
-        normalized.join(representatives, "source_record_id", "left")
-        .withColumn(
-            "canonical_seed",
-            F.least(
-                F.col("source_record_id"),
-                F.coalesce(F.col("min_peer_source_record_id"), F.col("source_record_id")),
-            ),
-        )
+        normalized.join(labels, "source_record_id", "left")
+        .join(representatives, "source_record_id", "left")
         .withColumn("canonical_product_id", F.sha2(F.concat_ws(":", F.lit("wdc"), "canonical_seed"), 256))
         .withColumn(
             "match_confidence",

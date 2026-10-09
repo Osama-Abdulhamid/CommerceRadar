@@ -6,6 +6,8 @@ import argparse
 import base64
 import json
 import os
+import re
+import uuid
 import urllib.parse
 import urllib.request
 from datetime import date, datetime
@@ -96,52 +98,69 @@ def json_default(value):
     raise TypeError(f"Unsupported JSON value: {type(value)!r}")
 
 
-def post_json_each_row(
-    rows: list[dict],
-    table: str,
-    columns: list[str],
-    http_url: str,
-    database: str,
-    user: str,
-    password: str,
-) -> None:
-    if not rows:
-        return
-
-    column_sql = ", ".join(columns)
-    query = f"INSERT INTO {database}.{table} ({column_sql}) FORMAT JSONEachRow"
-    url = f"{http_url.rstrip('/')}?query={urllib.parse.quote(query)}"
-    body = "\n".join(json.dumps(row, default=json_default, ensure_ascii=False) for row in rows).encode("utf-8")
-
-    request = urllib.request.Request(url, data=body, method="POST")
-    token = base64.b64encode(f"{user}:{password}".encode("utf-8")).decode("ascii")
+def execute_sql(sql, http_url, database, user, password, body=b""):
+    params = urllib.parse.urlencode({
+        "query": sql,
+        "database": database,
+        "wait_end_of_query": "1",
+        "async_insert": "0",
+    })
+    request = urllib.request.Request(
+        http_url.rstrip("/") + "/?" + params,
+        data=body,
+        method="POST",
+    )
+    token = base64.b64encode(
+        f"{user}:{password}".encode("utf-8")
+    ).decode("ascii")
     request.add_header("Authorization", f"Basic {token}")
-
-    with urllib.request.urlopen(request, timeout=60) as response:
-        response.read()
+    with urllib.request.urlopen(request, timeout=120) as response:
+        return response.read().decode("utf-8")
 
 
 def load_frame(
-    frame: DataFrame,
-    table: str,
-    columns: list[str],
-    http_url: str,
-    database: str,
-    user: str,
-    password: str,
-    batch_size: int,
-) -> None:
-    def send_partition(iterator):
-        batch = []
-        for row in iterator:
-            batch.append({column: row[column] for column in columns})
-            if len(batch) >= batch_size:
-                post_json_each_row(batch, table, columns, http_url, database, user, password)
-                batch = []
-        post_json_each_row(batch, table, columns, http_url, database, user, password)
-        yield 1
+    frame, table, columns, http_url, database,
+    user, password, batch_size,
+):
+    # Only the driver sends inserts: worker retries cannot insert twice.
+    batch = []
+    batch_bytes = 0
+    sent = 0
 
-    frame.select(*columns).rdd.mapPartitions(send_partition).count()
+    def send(lines):
+        body = (chr(10).join(lines) + chr(10)).encode("utf-8")
+        execute_sql(
+            f"INSERT INTO {database}.{table} "
+            f"({', '.join(columns)}) FORMAT JSONEachRow",
+            http_url, database, user, password, body,
+        )
+
+    for row in frame.select(*columns).toLocalIterator(
+        prefetchPartitions=False
+    ):
+        line = json.dumps(
+            {column: row[column] for column in columns},
+            default=json_default,
+            ensure_ascii=False,
+            allow_nan=False,
+        )
+        size = len(line.encode("utf-8")) + 1
+        if size > 4_000_000:
+            raise ValueError("One row exceeds the 4 MB insert limit")
+        if batch and (
+            len(batch) >= batch_size or batch_bytes + size > 4_000_000
+        ):
+            send(batch)
+            sent += len(batch)
+            batch = []
+            batch_bytes = 0
+        batch.append(line)
+        batch_bytes += size
+
+    if batch:
+        send(batch)
+        sent += len(batch)
+    return sent
 
 
 def prepare_frame(spark: SparkSession, base_path: str, dataset: str) -> DataFrame:
@@ -150,16 +169,6 @@ def prepare_frame(spark: SparkSession, base_path: str, dataset: str) -> DataFram
         frame = frame.withColumn("price", F.col("price_decimal"))
     return frame
 
-
-def truncate_tables(http_url: str, database: str, user: str, password: str) -> None:
-    for spec in TABLES.values():
-        query = f"TRUNCATE TABLE IF EXISTS {database}.{spec['table']}"
-        url = f"{http_url.rstrip('/')}?query={urllib.parse.quote(query)}"
-        request = urllib.request.Request(url, method="POST")
-        token = base64.b64encode(f"{user}:{password}".encode("utf-8")).decode("ascii")
-        request.add_header("Authorization", f"Basic {token}")
-        with urllib.request.urlopen(request, timeout=60) as response:
-            response.read()
 
 
 def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
@@ -176,6 +185,19 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
         parser.error("--input-base or BATCH_OUTPUT_PATH is required")
     if not args.password:
         parser.error("--password or CLICKHOUSE_PASSWORD is required")
+    if args.truncate:
+        parser.error("--truncate is disabled; staging replacement is used")
+    if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", args.database):
+        parser.error("Invalid database identifier")
+    if args.batch_size < 1:
+        parser.error("--batch-size must be positive")
+    url = urllib.parse.urlsplit(args.clickhouse_url)
+    if (
+        url.scheme not in {"http", "https"} or not url.hostname
+        or url.username or url.password or url.query or url.fragment
+        or url.path not in {"", "/"}
+    ):
+        parser.error("Invalid ClickHouse HTTP URL")
     return args
 
 
@@ -183,26 +205,87 @@ def main(argv: Iterable[str] | None = None) -> int:
     args = parse_args(argv)
     spark = build_spark()
     spark.sparkContext.setLogLevel("WARN")
+    run_id = uuid.uuid4().hex
+    staged = []
+
+    def sql(query):
+        return execute_sql(
+            query, args.clickhouse_url, args.database,
+            args.user, args.password,
+        )
+
+    print(f"Batch load run: {run_id}", flush=True)
+
     try:
-        if args.truncate:
-            truncate_tables(args.clickhouse_url, args.database, args.user, args.password)
+        engine = sql(
+            "SELECT engine FROM system.databases "
+            f"WHERE name = '{args.database}'"
+        ).strip()
+        if engine != "Atomic":
+            raise ValueError("Staging replacement requires an Atomic database")
 
         for dataset, spec in TABLES.items():
+            target = spec["table"]
+            stage = f"{target}_stage_{run_id}"
             frame = prepare_frame(spark, args.input_base, dataset)
-            load_frame(
-                frame=frame,
-                table=spec["table"],
-                columns=spec["columns"],
-                http_url=args.clickhouse_url,
-                database=args.database,
-                user=args.user,
-                password=args.password,
-                batch_size=args.batch_size,
-            )
-            print(f"Loaded {dataset} into {spec['table']}", flush=True)
+            expected = frame.count()
 
-        print("OK: Batch ClickHouse load complete.", flush=True)
+            if dataset == "product_matches":
+                keys = ["source_record_id"]
+                if expected == 0:
+                    raise ValueError("Product matches must not be empty")
+            elif dataset == "product_price_summary":
+                keys = ["canonical_product_id", "currency"]
+            elif dataset == "product_source_summary":
+                keys = ["canonical_product_id", "source", "currency"]
+            else:
+                keys = []
+                if expected != 1:
+                    raise ValueError("Expected exactly one evaluation row")
+
+            if keys and (
+                frame.groupBy(*keys).count()
+                .filter(F.col("count") > 1).limit(1).count()
+            ):
+                raise ValueError(f"Duplicate input keys in {dataset}")
+
+            sql(f"CREATE TABLE {args.database}.{stage} AS {args.database}.{target}")
+            print(f"Staging: {stage}; expected={expected}", flush=True)
+
+            sent = load_frame(
+                frame, stage, spec["columns"],
+                args.clickhouse_url, args.database,
+                args.user, args.password, args.batch_size,
+            )
+            stored = int(sql(
+                f"SELECT count() FROM {args.database}.{stage}"
+            ).strip())
+            if sent != expected or stored != expected:
+                raise ValueError(
+                    f"{dataset}: expected={expected}, sent={sent}, stored={stored}"
+                )
+            staged.append((target, stage))
+            print(f"Verified {dataset}: {stored} rows", flush=True)
+
+        # All staging tables passed checks before publishing starts.
+        # Each exchange is atomic separately, not across all four tables.
+        for target, stage in staged:
+            print(f"Publishing {target}; previous data retained in {stage}", flush=True)
+            sql(
+                f"EXCHANGE TABLES {args.database}.{target} "
+                f"AND {args.database}.{stage}"
+            )
+            print(f"Published {target}", flush=True)
+
+        print("OK: Batch tables replaced; previous tables retained.", flush=True)
         return 0
+    except Exception:
+        print(
+            f"FAILED run={run_id}. Staging/backup tables retained. "
+            "If publishing started, inspect the tables before retrying.",
+            flush=True,
+        )
+        raise
     finally:
         spark.stop()
 
