@@ -2,6 +2,32 @@ name: ${COMPOSE_PROJECT_NAME:-commerceradar}
 
 services:
 
+  quality-check:
+    profiles:
+      - quality
+    build:
+      context: .
+      dockerfile: quality/Dockerfile
+    command: ["python", "/app/server.py"]
+    environment:
+      INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_KEY:?Set INTERNAL_SERVICE_KEY in .env}
+      CLICKHOUSE_HTTP_URL: http://clickhouse:8123
+      CLICKHOUSE_DB: ${CLICKHOUSE_DB:-commerceradar}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-commerceradar}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?Set CLICKHOUSE_PASSWORD in .env}
+      QUALITY_REPORT_DIR: /reports
+    volumes:
+      - ${COMMERCE_DATA_ROOT:?Set COMMERCE_DATA_ROOT in .env}/quality-reports:/reports
+    mem_limit: 768m
+    cpus: 1.0
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    networks:
+      - commerceradar
+    restart: unless-stopped
+
+
   airflow:
     image: apache/airflow:2.11.0-python3.12
     user: "50000:0"
