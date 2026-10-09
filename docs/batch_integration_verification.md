@@ -72,3 +72,23 @@ tests/check_matching_groups.py
 
 API:
 http://localhost:18000/docs
+
+## Matching budget guard
+
+Before the candidate self-join, category/token block sizes are measured.
+Defaults:
+- MATCH_MAX_BLOCK_SIZE=500
+- MATCH_MAX_PAIR_BUDGET=5000000
+
+The pair estimate is an upper bound before brand filtering and pair
+deduplication; it is not the final candidate count.
+
+Verified sample:
+- Largest block: 83 records.
+- Pair upper bound: 8723.
+- Default limits passed and matching results remained unchanged.
+- Setting MATCH_MAX_BLOCK_SIZE=50 stopped the job before the self-join.
+- No output directory was created by the rejected run.
+
+This guard prevents an oversized candidate join; it does not establish
+that full-dataset matching fits the machine's memory or runtime budget.

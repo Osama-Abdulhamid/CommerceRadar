@@ -124,6 +124,44 @@ def generate_candidate_pairs(normalized: DataFrame) -> DataFrame:
         F.explode("blocking_tokens").alias("blocking_token"),
     )
 
+    # Measure category/token blocks before the expensive self-join.
+    max_block_size = int(os.getenv("MATCH_MAX_BLOCK_SIZE", "500"))
+    max_pair_budget = int(os.getenv("MATCH_MAX_PAIR_BUDGET", "5000000"))
+    if max_block_size < 2 or max_pair_budget < 1:
+        raise ValueError("Invalid matching block size or pair budget")
+
+    blocks = (
+        exploded.withColumn(
+            "block_category",
+            F.coalesce(F.col("normalized_category"), F.lit("")),
+        )
+        .groupBy("block_category", "blocking_token")
+        .count()
+    )
+    stats = blocks.agg(
+        F.max("count").alias("largest_block"),
+        F.sum(
+            F.col("count").cast("decimal(38,0)")
+            * (F.col("count") - 1) / F.lit(2)
+        ).alias("pair_upper_bound"),
+    ).first()
+
+    largest = int(stats["largest_block"] or 0)
+    pair_bound = int(stats["pair_upper_bound"] or 0)
+    print(
+        f"Blocking: largest_block={largest}; "
+        f"pair_upper_bound={pair_bound}",
+        flush=True,
+    )
+
+    if largest > max_block_size or pair_bound > max_pair_budget:
+        blocks.orderBy(F.desc("count")).show(10, truncate=False)
+        raise RuntimeError(
+            "Matching budget exceeded before self-join. "
+            "Refine blocking or process a smaller sample; "
+            "no records were silently discarded."
+        )
+
     left = exploded.alias("left")
     right = exploded.alias("right")
 
