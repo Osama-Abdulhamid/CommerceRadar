@@ -369,3 +369,7 @@ def evaluate_all_alerts(
         "rules_checked": checked,
         "alerts_created": created,
     }
+
+
+from metrics import install_metrics
+install_metrics(app)

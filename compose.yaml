@@ -2,6 +2,47 @@ name: ${COMPOSE_PROJECT_NAME:-commerceradar}
 
 services:
 
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=7d
+      - --storage.tsdb.retention.size=512MB
+    ports:
+      - "127.0.0.1:19090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    mem_limit: 384m
+    cpus: 1.0
+    networks:
+      - commerceradar
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:12.1.0
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD in .env}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    ports:
+      - "127.0.0.1:13000:3000"
+    volumes:
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    mem_limit: 384m
+    cpus: 1.0
+    depends_on:
+      prometheus:
+        condition: service_started
+    networks:
+      - commerceradar
+    restart: unless-stopped
+
+
   quality-check:
     profiles:
       - quality
@@ -320,6 +361,8 @@ networks:
     driver: bridge
 
 volumes:
+  prometheus-data:
+  grafana-data:
   airflow-data:
   postgres-data:
   kafka-data:
