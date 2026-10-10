@@ -18,6 +18,11 @@
 - Prometheus API metrics and Grafana operations dashboard.
 - CSV/JSON snapshot export for Power BI.
 
+## Final runtime verification
+- A newly collected Adafruit event reached ClickHouse at 200 USD.
+- Airflow DAG imports have no errors.
+- Operations and quality scheduled runs succeeded after restart.
+
 ## Matching results and limitations
 - Identifier-eligible offers: 2,203,388.
 - Unresolved singleton offers: 14,248,111.
@@ -44,7 +49,6 @@
 
 ## Remaining acceptance work
 - Complete and review the Power BI report.
-- Confirm the latest real collected event reaches ClickHouse.
 - Record screenshots/video and prepare the presentation.
 - Review repository setup instructions for a fresh machine.
 - Review and integrate the fix/batch-integration branch into the
