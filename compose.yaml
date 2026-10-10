@@ -2,6 +2,42 @@ name: ${COMPOSE_PROJECT_NAME:-commerceradar}
 
 services:
 
+  batch-runner:
+    profiles:
+      - batch
+    build:
+      context: .
+      dockerfile: services/streaming/Dockerfile
+    entrypoint: python3
+    command: /workspace/services/batch/server.py
+    environment:
+      INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_KEY:?Set INTERNAL_SERVICE_KEY in .env}
+      CLICKHOUSE_HTTP_URL: http://clickhouse:8123
+      CLICKHOUSE_DB: ${CLICKHOUSE_DB:-commerceradar}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-commerceradar}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?Set CLICKHOUSE_PASSWORD in .env}
+      PYSPARK_PYTHON: python3
+      PYSPARK_DRIVER_PYTHON: python3
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - .:/workspace:ro
+      - batch-state:/state
+      - ./infra/hdfs/core-site.xml:/opt/spark/conf/core-site.xml:ro
+      - ./infra/hdfs/hdfs-site.xml:/opt/spark/conf/hdfs-site.xml:ro
+    mem_limit: 2g
+    cpus: 2.0
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      namenode:
+        condition: service_healthy
+      datanode:
+        condition: service_started
+    networks:
+      - commerceradar
+    restart: unless-stopped
+
+
   prometheus:
     image: prom/prometheus:v3.5.0
     command:
@@ -361,6 +397,7 @@ networks:
     driver: bridge
 
 volumes:
+  batch-state:
   prometheus-data:
   grafana-data:
   airflow-data:
