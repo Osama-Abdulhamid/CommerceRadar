@@ -19,6 +19,7 @@
 - CSV/JSON snapshot export for Power BI.
 
 ## Final runtime verification
+- Verified implementation merged into main and pushed to GitHub.
 - A newly collected Adafruit event reached ClickHouse at 200 USD.
 - Airflow DAG imports have no errors.
 - Operations and quality scheduled runs succeeded after restart.
@@ -51,8 +52,6 @@
 - Complete and review the Power BI report.
 - Record screenshots/video and prepare the presentation.
 - Review repository setup instructions for a fresh machine.
-- Review and integrate the fix/batch-integration branch into the
-  submission branch; currently it is pushed but not confirmed merged.
 
 ## Demo locations
 - API documentation: http://localhost:18000/docs

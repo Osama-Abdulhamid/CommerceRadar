@@ -32,7 +32,7 @@ Verified implementation:
 Remaining submission work:
 - Complete and review the Power BI report.
 - Prepare presentation, screenshots and demonstration video.
-- Review fresh-machine setup and integrate the submission branch.
+- Review fresh-machine setup.
 
 Important limits:
 - Identifier matching is experimental: high precision, very low recall.
@@ -42,7 +42,7 @@ Important limits:
 - CSV exports do not refresh automatically.
 - This is a single-machine prototype.
 
-Current implementation branch: `fix/batch-integration`.
+Current implementation branch: `main`.
 
 Detailed verified scope:
 - [Submission status](docs/submission_status.md)
