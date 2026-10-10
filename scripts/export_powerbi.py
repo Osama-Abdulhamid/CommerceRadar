@@ -45,6 +45,8 @@ routes = {
     "streaming_changes": "/streaming/changes?limit=500",
     "matching_coverage": "/matching/overview",
     "matching_categories": "/matching/categories",
+    "streaming_price_history": "/streaming/price-history?limit=5000",
+    "demo_competitor_prices": "/demo/competitor-prices",
 }
 
 for name, route in routes.items():
@@ -80,7 +82,7 @@ Adafruit observations are real collected data.
 demo_shop sources are simulated demonstration data.
 Streaming files contain up to 500 recent rows each.
 The files are a snapshot; they do not refresh automatically.
-No dedicated price-history export is included yet.
+Price history contains up to 5000 recent observations.\nCompetitor comparisons are simulated and use explicit demo product IDs.
 """,
     encoding="utf-8",
 )

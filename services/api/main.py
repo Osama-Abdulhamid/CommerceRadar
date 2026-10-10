@@ -401,3 +401,59 @@ def matching_categories(client: ClickHouseClient = Depends(get_clickhouse)):
         SETTINGS max_threads = 1
         """,
     )
+
+
+@app.get("/streaming/price-history")
+def streaming_price_history(
+    source: str | None = Query(default=None, max_length=100),
+    source_product_id: str | None = Query(default=None, max_length=200),
+    limit: int = Query(default=500, ge=1, le=5000),
+    client: ClickHouseClient = Depends(get_clickhouse),
+):
+    filters = []
+    if source:
+        filters.append(f"source = {sql_string(source)}")
+    if source_product_id:
+        filters.append(
+            f"source_product_id = {sql_string(source_product_id)}"
+        )
+    where = "WHERE " + " AND ".join(filters) if filters else ""
+    return run_query(
+        client,
+        f"""
+        SELECT event_id, observed_at, source, source_product_id,
+               title, price, currency, availability
+        FROM commerceradar.product_observations FINAL
+        {where}
+        ORDER BY observed_at DESC, event_id
+        LIMIT {limit}
+        """,
+    )
+
+
+@app.get("/demo/competitor-prices")
+def demo_competitor_prices(
+    client: ClickHouseClient = Depends(get_clickhouse),
+):
+    return run_query(
+        client,
+        """
+        SELECT
+            source_product_id AS demo_product_id,
+            currency,
+            min(price) AS lowest_price,
+            max(price) AS highest_price,
+            max(price) - min(price) AS price_gap,
+            uniqExact(source) AS store_count,
+            'simulated' AS data_origin
+        FROM commerceradar.current_products
+        WHERE source IN ('demo_market_a', 'demo_market_b')
+          AND source_product_id IN (
+              'DEMO-PHONE-128', 'DEMO-LAPTOP-16', 'DEMO-HEADPHONES'
+          )
+          AND availability = 'in_stock'
+        GROUP BY source_product_id, currency
+        HAVING store_count = 2
+        ORDER BY demo_product_id, currency
+        """,
+    )
