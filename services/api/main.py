@@ -373,3 +373,31 @@ def evaluate_all_alerts(
 
 from metrics import install_metrics
 install_metrics(app)
+
+
+@app.get("/matching/overview")
+def matching_overview(client: ClickHouseClient = Depends(get_clickhouse)):
+    return run_query(
+        client,
+        """
+        SELECT
+            sum(total_offers) AS total_offers,
+            sum(identifier_eligible_offers) AS identifier_eligible_offers,
+            sum(unresolved_offers) AS unresolved_offers
+        FROM commerceradar.wdc_identifier_coverage
+        SETTINGS max_threads = 1
+        """,
+    )[0]
+
+
+@app.get("/matching/categories")
+def matching_categories(client: ClickHouseClient = Depends(get_clickhouse)):
+    return run_query(
+        client,
+        """
+        SELECT *
+        FROM commerceradar.wdc_identifier_coverage
+        ORDER BY total_offers DESC
+        SETTINGS max_threads = 1
+        """,
+    )
