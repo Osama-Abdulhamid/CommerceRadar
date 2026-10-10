@@ -13,45 +13,46 @@ is outside the current prototype scope.
 
 ## Current Status
 
-Implemented and verified:
-- Versioned streaming and WDC batch data contracts.
-- Synthetic replay samples and validation tooling.
-- Dockerized Replay Producer with acknowledged Kafka delivery.
-- Single-node Kafka with three topic partitions and persistent storage.
-- Spark Structured Streaming with contract validation and checkpoints.
-- Invalid streaming records quarantined as Parquet.
-- Direct Adafruit collector: one real product observation per execution.
-- ClickHouse storage and Spark HTTP sink.
-- Verified Adafruit -> Kafka -> Spark -> ClickHouse delivery.
-- ClickHouse persistence tested after restart.
-- WDC dataset: 16,451,499 records cleaned to Parquet.
-- All full-dataset cleaned JSON records validated against the batch contract.
-- Persistent HDFS NameNode and DataNode.
-- Full cleaned Parquet dataset imported into HDFS and read by Spark.
-- HDFS filesystem check reported HEALTHY.
+Verified implementation:
+- Kafka and Spark Structured Streaming with validation and checkpoints.
+- Real periodic Adafruit collection and explicitly simulated replay data.
+- Full cleaned WDC: 16,451,499 offers in ClickHouse.
+- Full experimental identifier matching, stored in Parquet and HDFS.
+- Verified staged publication of matching results to ClickHouse.
+- WDC category, price and quality analytics.
+- Current offers, observation history and price/stock change views.
+- Explicitly mapped simulated competitor comparisons.
+- FastAPI analytics and authenticated application routes.
+- PostgreSQL accounts, sessions, settings and in-app alerts.
+- Airflow operations and quality schedules; on-demand HDFS sample batch.
+- Great Expectations full-table aggregate checks.
+- Prometheus API metrics and provisioned Grafana dashboard.
+- CSV/JSON snapshot exports for Power BI.
 
-Remaining:
-- Periodic collection and broader source coverage.
-- Price and stock change detection.
-- Full-dataset execution of product matching and historical analytical aggregations.
-- Loading generated batch Parquet outputs into ClickHouse.
-- FastAPI, PostgreSQL, and Power BI.
-- Airflow, Great Expectations, and monitoring.
-- Team handoff and final integration.
+Remaining submission work:
+- Complete and review the Power BI report.
+- Prepare presentation, screenshots and demonstration video.
+- Review fresh-machine setup and integrate the submission branch.
 
-Implementation is currently on feature/kafka-streaming.
-The main branch has not yet received these changes.
+Important limits:
+- Identifier matching is experimental: high precision, very low recall.
+- WDC does not establish temporal price trends or reliable store identity.
+- Competitor comparisons use simulated stores and explicit demo IDs.
+- Full-data batch jobs are manually invoked.
+- CSV exports do not refresh automatically.
+- This is a single-machine prototype.
 
-Service guides:
-- services/replay_producer/README.md
-- services/ingestion/README.md
-- services/streaming/README.md
-- services/batch/README.md
-- services/api/README.md
-- infra/hdfs/README.md
-- infra/clickhouse/README.md
-- docs/batch_intelligence.md
-- docs/member4_visualization_strategy.md
+Current implementation branch: `fix/batch-integration`.
+
+Detailed verified scope:
+- [Submission status](docs/submission_status.md)
+- [Full identifier matching](docs/full_identifier_matching.md)
+- [Market demonstration](docs/market_demo.md)
+- [Batch integration](docs/batch_integration_verification.md)
+- [Batch orchestration](docs/batch_orchestration.md)
+- [Airflow](orchestration/airflow/README.md)
+- [Data quality](quality/README.md)
+- [Monitoring](monitoring/README.md)
 
 ## Planned Architecture
 
@@ -73,11 +74,11 @@ datasets stored in HDFS.
 
 Application:
 - FastAPI: backend API.
-- PostgreSQL: users, settings, and alert rules only.
+- PostgreSQL: users, sessions, settings, alert rules and notifications.
 
 Implemented API:
 FastAPI reads ClickHouse batch product-intelligence tables and the streaming
-observation table. Power BI and visualization design remain Member 4 work.
+observation table, full WDC analytics and identifier coverage. Power BI report preparation is in progress.
 
 Supporting components:
 - Airflow: orchestration.
