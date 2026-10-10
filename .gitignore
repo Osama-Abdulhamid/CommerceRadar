@@ -40,3 +40,4 @@ htmlcov/
 .idea/
 .DS_Store
 Thumbs.db
+/data/samples/market_demo.generated.jsonl
