@@ -55,7 +55,7 @@ def evaluate_user(user_id):
                 )
             else:
                 condition = (
-                    "availability_changed = 1 "
+                    "stock_changed = 1 "
                     "AND availability = 'in_stock' "
                     "AND previous_availability = 'out_of_stock'"
                 )
