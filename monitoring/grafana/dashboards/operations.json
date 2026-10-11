@@ -1,9 +1,9 @@
 {
   "uid": "commerceradar-operations",
   "title": "CommerceRadar Operations",
-  "description": "API scrape availability, request rate, errors, latency and process memory. Scrape health does not establish database or full-pipeline health.",
+  "description": "API operations: availability, traffic, response statuses, latency, CPU, memory and uptime. These metrics do not establish full-pipeline or database health.",
   "schemaVersion": 41,
-  "version": 1,
+  "version": 3,
   "timezone": "browser",
   "refresh": "15s",
   "time": {
@@ -139,6 +139,154 @@
       }
     },
     {
+      "id": 7,
+      "title": "API uptime",
+      "description": "Time since the API process started; resets after restart.",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "commerceradar-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "time() - process_start_time_seconds{job=\"commerceradar-api\"}",
+          "legendFormat": "Uptime",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "commerceradar-prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "green"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 8,
+        "h": 5
+      }
+    },
+    {
+      "id": 8,
+      "title": "Requests since API restart",
+      "description": "Completed requests in the current API process lifetime.",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "commerceradar-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(commerceradar_http_requests_total{job=\"commerceradar-api\"})",
+          "legendFormat": "Completed requests",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "commerceradar-prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 5,
+        "w": 8,
+        "h": 5
+      }
+    },
+    {
+      "id": 9,
+      "title": "Client errors per second",
+      "description": "Client errors such as 401, 404 and 422; separate from server errors.",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "commerceradar-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(commerceradar_http_requests_total{job=\"commerceradar-api\",status=~\"4..\"}[5m])) or vector(0)",
+          "legendFormat": "4xx / second",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "commerceradar-prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 5,
+        "w": 8,
+        "h": 5
+      }
+    },
+    {
       "id": 4,
       "title": "Requests by route",
       "type": "timeseries",
@@ -148,8 +296,8 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 5,
-        "w": 24,
+        "y": 10,
+        "w": 12,
         "h": 8
       },
       "targets": [
@@ -172,6 +320,49 @@
       "options": {}
     },
     {
+      "id": 13,
+      "title": "Request rate by HTTP status",
+      "description": "Completed requests grouped by HTTP response status.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "commerceradar-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (status) (rate(commerceradar_http_requests_total{job=\"commerceradar-api\"}[5m]))",
+          "legendFormat": "HTTP {{status}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "commerceradar-prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 10,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
       "id": 5,
       "title": "95th percentile request duration",
       "type": "timeseries",
@@ -181,8 +372,8 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 13,
-        "w": 24,
+        "y": 18,
+        "w": 12,
         "h": 8
       },
       "targets": [
@@ -205,6 +396,145 @@
       "options": {}
     },
     {
+      "id": 10,
+      "title": "Latency percentiles: p50 and p99",
+      "description": "Histogram estimates; p99 describes the slow tail of requests.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "commerceradar-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.5, sum by (le) (rate(commerceradar_http_request_duration_seconds_bucket{job=\"commerceradar-api\"}[5m])))",
+          "legendFormat": "p50",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "commerceradar-prometheus"
+          }
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(commerceradar_http_request_duration_seconds_bucket{job=\"commerceradar-api\"}[5m])))",
+          "legendFormat": "p99",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "commerceradar-prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 18,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "id": 11,
+      "title": "Mean request duration by route",
+      "description": "Mean response time by route; includes database and network waiting.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "commerceradar-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (route) (rate(commerceradar_http_request_duration_seconds_sum{job=\"commerceradar-api\"}[5m])) / sum by (route) (rate(commerceradar_http_request_duration_seconds_count{job=\"commerceradar-api\"}[5m]))",
+          "legendFormat": "{{route}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "commerceradar-prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 26,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "id": 14,
+      "title": "Server error ratio",
+      "description": "Fraction of requests returning 5xx; undefined when no requests occur.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "commerceradar-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(sum(rate(commerceradar_http_requests_total{job=\"commerceradar-api\",status=~\"5..\"}[5m])) or vector(0)) / sum(rate(commerceradar_http_requests_total{job=\"commerceradar-api\"}[5m]))",
+          "legendFormat": "5xx / all requests",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "commerceradar-prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 26,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
       "id": 6,
       "title": "API process memory",
       "type": "timeseries",
@@ -214,8 +544,8 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 21,
-        "w": 24,
+        "y": 34,
+        "w": 12,
         "h": 8
       },
       "targets": [
@@ -236,6 +566,49 @@
         "overrides": []
       },
       "options": {}
+    },
+    {
+      "id": 12,
+      "title": "API CPU usage",
+      "description": "API process CPU: 100% represents one CPU core, not the whole host.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "commerceradar-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "100 * rate(process_cpu_seconds_total{job=\"commerceradar-api\"}[5m])",
+          "legendFormat": "API CPU",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "commerceradar-prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 34,
+        "w": 12,
+        "h": 8
+      }
     }
   ]
 }
